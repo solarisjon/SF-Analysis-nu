@@ -1,0 +1,7 @@
+[project]
+name = "sf-analysistool-nu"
+version = "0.1.0"
+description = "nushell function to help read sf-* files."
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = []
