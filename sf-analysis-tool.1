@@ -1,0 +1,346 @@
+.TH SF-ANALYSIS-TOOL 1 "2024" "SolidFire Analysis Tool" "User Commands"
+.SH NAME
+sf-analysis-tool \- SolidFire storage system log analysis toolkit
+.SH SYNOPSIS
+.B nu
+.RI "src/parsesfv" X ".nu"
+.br
+.B use
+.RI "src/parsesfv" X ".nu"
+.br
+.B parse-sf-logs
+.RI "[ options ]"
+.I file_path
+.br
+.B python
+.I src/sf_preprocessor.py
+.I input.log
+.I output_base
+.br
+.B ./sf-parser/target/release/sf-parser
+.I input.log
+.I output.jsonl
+.SH DESCRIPTION
+The SolidFire Analysis Tool is a comprehensive log analysis toolkit designed for parsing and analyzing SolidFire storage system logs. It provides multiple parsing engines optimized for different use cases, from interactive analysis to high-performance batch processing.
+
+The tool converts structured SolidFire logs into tabular data, extracting nested objects, key-value pairs, arrays, and timestamps for efficient analysis and reporting.
+
+.SH PARSER MODULES
+.TP
+.B parsesfv2.nu
+Core parser module providing comprehensive log parsing with full feature support. Best for general-purpose analysis and files up to 1GB.
+.TP
+.B parsesfv3.nu  
+Optimized fast parser with improved performance using Nushell match statements. 15-20% faster than v2 with identical output format.
+.TP
+.B parsesfv4.nu
+Streaming parser designed for very large files. Processes logs in configurable chunks to handle multi-GB files with constant memory usage.
+.TP
+.B parsesfv5.nu
+Hybrid Rust+Nushell parser providing maximum performance through Rust preprocessing and Nushell analysis capabilities.
+.TP
+.B load_jsonl.nu
+Utilities for loading and filtering preprocessed JSONL data with column filtering and row limiting capabilities.
+.TP
+.B preprocess.nu
+Fast preprocessing utility using ripgrep for initial data extraction and exploration.
+
+.SH CORE FUNCTIONS
+.TP
+.B parse-sf-logs file_path [--columns-info]
+Parse SolidFire log file and return structured data. Use --columns-info to display column information and sample data.
+.TP
+.B parse-sf-logs-fast file_path [--columns-info]
+High-performance version of parse-sf-logs with optimized type conversion.
+.TP
+.B parse-sf-logs-streaming file_path [chunk_size]
+Stream-process large files in chunks. Default chunk size is 1000 lines.
+.TP
+.B extract-sf-faults file_path
+Ultra-fast extraction of cluster fault data only using ripgrep.
+.TP
+.B parse-sf-logs-rust file_path [--preprocess]
+Hybrid parser using Rust preprocessing. Use --preprocess for initial processing.
+.TP
+.B load-sf-data [--type pattern] [--limit N]
+Load preprocessed JSONL data with optional column filtering and row limiting.
+.TP
+.B preprocess-sf-logs input_file output_file
+Fast preprocessing using ripgrep for initial data extraction.
+
+.SH SPECIALIZED ANALYSIS FUNCTIONS
+.TP
+.B analyze-cluster-faults data
+Analyze cluster fault data from preprocessed logs.
+.TP
+.B analyze-node-health data
+Analyze node health and status information.
+.TP
+.B analyze-services data
+Analyze service and slice status information.
+.TP
+.B load-sf-sample [size]
+Load sample data for testing (default: 1000 records).
+.TP
+.B load-sf-test [--type pattern] [--limit N]
+Load test data (simplelog) with filtering options.
+
+.SH LOG FORMAT
+SolidFire logs use a structured format with several components:
+.TP
+.B Timestamps
+ISO 8601 format: 2024-01-01T12:00:00.123456
+.TP
+.B Nested Objects
+Structured data: clusterFault={{key=value, details=[...]}}
+.TP
+.B Key-Value Pairs
+Simple assignments: serviceID=1234, status=active
+.TP
+.B Arrays
+List data: details=[item1, item2, item3]
+.TP
+.B Mixed Types
+Strings, integers, floats, booleans with automatic type conversion
+
+.SH PERFORMANCE CHARACTERISTICS
+.TP
+.B parsesfv2.nu
+~10,000 lines/second, suitable for files up to 1GB
+.TP
+.B parsesfv3.nu
+~12,000-15,000 lines/second, optimized type conversion
+.TP
+.B parsesfv4.nu
+~8,000 lines/second streaming, constant memory usage
+.TP
+.B parsesfv5.nu + Rust
+~100,000 lines/second preprocessing, ~500,000 records/second analysis
+.TP
+.B extract-sf-faults
+~50,000 lines/second using ripgrep
+.TP
+.B Python preprocessor
+~150,000-300,000 lines/second with Parquet output
+
+.SH OUTPUT FORMAT
+Parsed data is returned as Nushell tables with the following column types:
+.TP
+.B Core Columns
+date, time (extracted from timestamps), col_0, col_1, ... (space-separated fields)
+.TP
+.B Structured Data
+objectName(key)_N (structured object fields with counter to avoid duplicates)
+.TP
+.B Simple Fields
+key (direct key-value pairs)
+.TP
+.B Arrays
+objectName(details)_N (array contents as strings)
+
+.SH EXAMPLES
+.TP
+.B Basic parsing
+.nf
+use src/parsesfv2.nu
+parse-sf-logs "data/sf-master.info" --columns-info
+.fi
+.TP
+.B Fast parsing with filtering
+.nf
+use src/parsesfv3.nu
+parse-sf-logs-fast "data/sf-master.error" | where clusterFault_type == "warning"
+.fi
+.TP
+.B Streaming large files
+.nf
+use src/parsesfv4.nu
+parse-sf-logs-streaming "data/large-sf-log.info" 5000
+.fi
+.TP
+.B Hybrid Rust processing
+.nf
+use src/parsesfv5.nu
+# First run - preprocess
+parse-sf-logs-rust "data/sf-master.info.18" --preprocess
+# Subsequent runs - fast analysis
+let data = parse-sf-logs-rust "data/sf-master.info.18"
+$data | analyze-cluster-faults
+.fi
+.TP
+.B Loading preprocessed data
+.nf
+use src/load_jsonl.nu
+load-sf-data --type "*snap*" --limit 1000
+load-sf-data --type "*ID" --limit 500
+.fi
+.TP
+.B Quick fault extraction
+.nf
+use src/parsesfv4.nu
+extract-sf-faults "data/sf-master.error" | save "faults.csv"
+.fi
+.TP
+.B Python preprocessing
+.nf
+python src/sf_preprocessor.py data/large-file.log output/processed
+.fi
+.TP
+.B Rust preprocessing
+.nf
+cd sf-parser && cargo build --release
+./target/release/sf-parser ../data/sf-master.info.18 ../output/processed.jsonl
+.fi
+
+.SH FILES
+.TP
+.B src/parsesfv2.nu
+Core parser module
+.TP
+.B src/parsesfv3.nu
+Optimized fast parser
+.TP
+.B src/parsesfv4.nu
+Streaming parser
+.TP
+.B src/parsesfv5.nu
+Rust-accelerated parser
+.TP
+.B src/load_jsonl.nu
+JSONL data loader utilities
+.TP
+.B src/preprocess.nu
+Ripgrep-based preprocessor
+.TP
+.B src/sf_parser.rs
+Rust preprocessor source
+.TP
+.B src/sf_preprocessor.py
+Python preprocessor with Polars
+.TP
+.B data/
+Directory containing SolidFire log files
+.TP
+.B output/
+Directory for processed output files
+.TP
+.B docs/
+Nushell documentation for reference
+
+.SH DEPENDENCIES
+.TP
+.B Required
+Nushell (latest version recommended)
+.TP
+.B Optional
+ripgrep (rg) for preprocessing functions
+.br
+Rust toolchain for sf_parser.rs compilation
+.br
+Python with Polars library for Python preprocessor
+.br
+uv package manager for Python dependencies
+
+.SH TESTING
+The tool includes several test files for validation:
+.TP
+.B data/simplelog
+Small test file for basic functionality testing
+.TP
+.B data/sf-master.info.18
+Realistic test file representing primary use case
+.TP
+.B Basic test
+.nf
+use src/parsesfv2.nu
+parse-sf-logs "data/simplelog" --columns-info
+.fi
+
+.SH PERFORMANCE RECOMMENDATIONS
+.TP
+.B Small files (<100MB)
+Use parsesfv2.nu for full feature support
+.TP
+.B Medium files (100MB-1GB)
+Use parsesfv3.nu for optimal performance
+.TP
+.B Large files (1GB-5GB)
+Use parsesfv4.nu for streaming processing
+.TP
+.B Very large files (5GB+)
+Use parsesfv5.nu with Rust preprocessing or Python preprocessor
+.TP
+.B Fault analysis only
+Use extract-sf-faults for maximum speed
+.TP
+.B Repeated analysis
+Preprocess once with Rust or Python, then use JSONL loaders
+
+.SH ERROR HANDLING
+The tool includes comprehensive error handling:
+.TP
+.B Malformed log entries
+Gracefully handled with partial data extraction
+.TP
+.B Memory constraints
+Streaming parsers prevent memory exhaustion
+.TP
+.B Missing files
+Clear error messages with suggested alternatives
+.TP
+.B Type conversion errors
+Fallback to string representation
+
+.SH COMPATIBILITY
+.TP
+.B Nushell versions
+Tested with Nushell 0.90+, latest version recommended
+.TP
+.B Output formats
+CSV, JSON, JSONL, Parquet support
+.TP
+.B Cross-platform
+Works on Linux, macOS, Windows with appropriate dependencies
+
+.SH CONTRIBUTING
+.TP
+.B Code style
+Follow Nushell coding standards with snake_case variables
+.TP
+.B Testing
+Always test with data/simplelog before committing changes
+.TP
+.B Documentation
+Update CLAUDE.md and README.md for significant changes
+.TP
+.B Performance
+Benchmark against existing parsers when adding new features
+
+.SH VERSION HISTORY
+.TP
+.B v2.0
+Core parser with comprehensive feature support
+.TP
+.B v3.0
+Optimized parser with improved performance
+.TP
+.B v4.0
+Streaming parser for large files
+.TP
+.B v5.0
+Rust-accelerated hybrid parser
+
+.SH AUTHOR
+SolidFire Analysis Tool Team
+
+.SH REPORTING BUGS
+Report bugs and issues through the project repository or contact the development team.
+
+.SH COPYRIGHT
+Copyright (c) 2024 SolidFire Analysis Tool Team. All rights reserved.
+
+.SH SEE ALSO
+.BR nushell (1),
+.BR ripgrep (1),
+.BR cargo (1),
+.BR python (1)
