@@ -416,6 +416,9 @@ fn main() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
+    use std::path::PathBuf;
+    use tempfile::TempDir;
     
     #[test]
     fn test_basic_log_parsing() {
@@ -430,5 +433,123 @@ mod tests {
         assert_eq!(record.parse_error, None);
         assert!(record.dynamic_fields.contains_key("serviceID"));
         assert!(record.dynamic_fields.contains_key("usedBytes"));
+    }
+    
+    #[test]
+    fn test_snapshot_log_parsing() {
+        let parser = SolidFireParser::new().unwrap();
+        let line = "2025-06-12T08:35:00.177183Z icpbasi03037 master-1[112875]: [APP-5] [Vvols] 2069183 Scheduler cs/CServiceSliceSnapshots.cpp:1037:UnregisterSnapshot| snapshotID=13846639 vvolParms=<empty> overrideSnapMirrorHold=False";
+        
+        let record = parser.parse_line(line, 1);
+        
+        assert_eq!(record.line_num, 1);
+        assert_eq!(record.date, "2025-06-12");
+        assert_eq!(record.time, "08:35:00.177183");
+        assert_eq!(record.parse_error, None);
+        assert!(record.dynamic_fields.contains_key("snapshotID"));
+        assert_eq!(record.dynamic_fields.get("snapshotID").unwrap(), &serde_json::Value::Number(serde_json::Number::from(13846639)));
+        assert!(record.dynamic_fields.contains_key("overrideSnapMirrorHold"));
+        assert_eq!(record.dynamic_fields.get("overrideSnapMirrorHold").unwrap(), &serde_json::Value::Bool(false));
+    }
+    
+    #[test]
+    fn test_schema_consistency() {
+        let parser = SolidFireParser::new().unwrap();
+        
+        // Create test data with different fields in each line
+        let lines = vec![
+            "2025-06-05T00:20:07.858372Z icpbasi03037 master-1[112875]: [APP-5] [MS] 2069182 BSDirector ms/ClusterStatistics.cpp:1452:GetBlockDriveUsageFromStats| serviceID=230 usedBytes=1909106990888",
+            "2025-06-12T08:35:00.177183Z icpbasi03037 master-1[112875]: [APP-5] [Vvols] 2069183 Scheduler cs/CServiceSliceSnapshots.cpp:1037:UnregisterSnapshot| snapshotID=13846639 vvolParms=<empty> overrideSnapMirrorHold=False",
+            "2025-06-05T00:20:07.858372Z icpbasi03037 master-1[112875]: [APP-5] [MS] 2069182 BSDirector ms/ClusterStatistics.cpp:1452:GetBlockDriveUsageFromStats| volumeID=1207 nodeID=2"
+        ];
+        
+        // Parse all lines and collect unique dynamic field names
+        let mut all_fields = HashSet::new();
+        let mut records = Vec::new();
+        
+        for (i, line) in lines.iter().enumerate() {
+            let record = parser.parse_line(line, (i + 1) as u32);
+            all_fields.extend(record.dynamic_fields.keys().cloned());
+            records.push(record);
+        }
+        
+        // Ensure all records have all dynamic fields (with nulls for missing)
+        for mut record in records.iter_mut() {
+            parser.ensure_complete_schema(&mut record.clone(), &all_fields);
+        }
+        
+        // Verify all records have the same number of dynamic fields
+        let first_record_field_count = records[0].dynamic_fields.len();
+        for record in &records {
+            assert_eq!(record.dynamic_fields.len(), first_record_field_count, 
+                "All records should have the same number of dynamic fields for schema consistency");
+            
+            // Verify all expected fields are present
+            for field_name in &all_fields {
+                assert!(record.dynamic_fields.contains_key(field_name), 
+                    "Field '{}' should be present in all records", field_name);
+            }
+        }
+    }
+    
+    #[test]
+    fn test_nushell_query_compatibility() {
+        let parser = SolidFireParser::new().unwrap();
+        let temp_dir = TempDir::new().unwrap();
+        
+        // Create test log file
+        let test_log_path = temp_dir.path().join("test.log");
+        let test_content = r#"2025-06-05T00:20:07.858372Z icpbasi03037 master-1[112875]: [APP-5] [MS] 2069182 BSDirector ms/ClusterStatistics.cpp:1452:GetBlockDriveUsageFromStats| serviceID=230 usedBytes=1909106990888
+2025-06-12T08:35:00.177183Z icpbasi03037 master-1[112875]: [APP-5] [Vvols] 2069183 Scheduler cs/CServiceSliceSnapshots.cpp:1037:UnregisterSnapshot| snapshotID=13846639 vvolParms=<empty> overrideSnapMirrorHold=False
+2025-06-12T08:35:00.178356Z icpbasi03037 master-1[112875]: [APP-5] [Snaps] 2069183 Scheduler cs/CServiceSliceSnapshots.cpp:866:UnregisterSnapshotInternal|Individual delete of group snapshot member sliceID=1207 snapshotID=13846639 groupSnapshotID=13933489 volumeID=1207
+2025-06-05T10:30:15.123456Z icpbasi03037 master-1[112875]: [APP-5] [MS] 2069182 BSDirector ms/ClusterStatistics.cpp:1452:GetBlockDriveUsageFromStats| serviceID=110 usedBytes=2000000000000"#;
+        
+        fs::write(&test_log_path, test_content).unwrap();
+        
+        // Parse with Rust parser
+        let output_path = temp_dir.path().join("output.json");
+        parser.parse_file(&test_log_path, &output_path, 1000).unwrap();
+        
+        // Verify file was created and is valid JSON
+        assert!(output_path.exists(), "Output JSON file should be created");
+        
+        let json_content = fs::read_to_string(&output_path).unwrap();
+        let parsed_json: serde_json::Value = serde_json::from_str(&json_content).unwrap();
+        
+        // Verify it's an array
+        assert!(parsed_json.is_array(), "Output should be a JSON array");
+        let records = parsed_json.as_array().unwrap();
+        assert_eq!(records.len(), 4, "Should have 4 parsed records");
+        
+        // Verify all records have consistent schema
+        let first_record = &records[0];
+        let expected_keys: HashSet<String> = first_record.as_object().unwrap().keys().cloned().collect();
+        
+        for (i, record) in records.iter().enumerate() {
+            let record_obj = record.as_object().unwrap();
+            let record_keys: HashSet<String> = record_obj.keys().cloned().collect();
+            assert_eq!(record_keys, expected_keys, 
+                "Record {} should have the same keys as the first record", i);
+        }
+        
+        // Verify specific field presence for nushell queries
+        for record in records {
+            let obj = record.as_object().unwrap();
+            
+            // Core fields should always be present
+            assert!(obj.contains_key("line_num"), "line_num should be present");
+            assert!(obj.contains_key("date"), "date should be present");
+            assert!(obj.contains_key("time"), "time should be present");
+            assert!(obj.contains_key("timestamp"), "timestamp should be present");
+            assert!(obj.contains_key("snapshotID"), "snapshotID should be present (even if null)");
+            assert!(obj.contains_key("serviceID"), "serviceID should be present (even if null)");
+        }
+        
+        println!("✅ All nushell compatibility tests passed!");
+        println!("✅ JSON output is valid and has consistent schema");
+        println!("✅ Test queries that should work:");
+        println!("   nu -c 'open {} | where snapshotID == 13846639 | length'", output_path.display());
+        println!("   nu -c 'open {} | where serviceID == 230 | length'", output_path.display());
+        println!("   nu -c 'open {} | where time >= \"08:35:00\" | length'", output_path.display());
     }
 }
