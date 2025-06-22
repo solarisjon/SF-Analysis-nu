@@ -373,8 +373,8 @@ impl SolidFireParser {
 
 fn main() -> Result<()> {
     let matches = Command::new("sf-parser")
-        .version("0.1.0")
-        .about("High-performance SolidFire log parser")
+        .version(env!("CARGO_PKG_VERSION"))
+        .about("High-performance SolidFire log parser with nushell compatibility")
         .arg(Arg::new("input")
             .help("Input log file")
             .required(true)
