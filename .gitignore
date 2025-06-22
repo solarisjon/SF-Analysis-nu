@@ -28,3 +28,9 @@ __pycache__/
 # OS
 .DS_Store
 Thumbs.db
+
+# Large data files
+data/output.json
+data/sf-master.info
+data/sf-master.error*
+data/morning.json
