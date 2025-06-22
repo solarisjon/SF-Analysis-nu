@@ -1,0 +1,183 @@
+[sources.solidfire_logs]
+type = "file"
+include = ["./simplelog"]
+read_from = "beginning"
+
+[transforms.parse_basic]
+type = "remap"
+inputs = ["solidfire_logs"]
+source = '''
+# Parse the basic log structure first
+.parsed = parse_regex!(.message, r'^(?P<host>[^:]+):(?P<timestamp>\S+)\s+(?P<node>\S+)\s+(?P<service>[^:]+):\s+(?P<app>\[[^\]]+\])\s+(?P<service_type>\[[^\]]+\])\s+(?P<id>\d+)\s+(?P<process>\S+)\s+(?P<source_location>[^|]+)\|(?P<action>.*)$')
+
+# Convert timestamp
+.timestamp = parse_timestamp!(.parsed.timestamp, format: "%Y-%m-%dT%H:%M:%S%.fZ")
+
+# Extract structured data from action field
+.action_data = .parsed.action
+'''
+
+[transforms.extract_cluster_fault]
+type = "remap"
+inputs = ["parse_basic"]
+source = '''
+# Extract clusterFault={{...}} structures
+if match(.action_data, r'clusterFault=\{\{') {
+  .cluster_fault_match = parse_regex(.action_data, r'clusterFault=\{\{(?P<content>[^}]*(?:\{[^}]*\}[^}]*)*)\}')
+  
+  if exists(.cluster_fault_match.content) {
+    # Parse key=value pairs within clusterFault
+    .cluster_fault = {}
+    
+    # Extract details field specially (preserve as single string)
+    .details_match = parse_regex(.cluster_fault_match.content, r'details=\[(?P<details>[^\]]*)\]')
+    if exists(.details_match.details) {
+      .cluster_fault.details = .details_match.details
+    }
+    
+    # Remove details from content for other parsing
+    .content_no_details = replace(.cluster_fault_match.content, r'details=\[[^\]]*\]', "")
+    
+    # Parse other key=value pairs
+    .kv_matches = parse_regex_all(.content_no_details, r'(?P<key>\w+)=(?P<value>[^}\s]+(?:\{[^}]*\})?)')
+    
+    for_each(.kv_matches) -> |_index, match| {
+      key = "clusterFault(" + match.key + ")"
+      value = match.value
+      
+      # Type conversion
+      if value == "true" {
+        .cluster_fault = set!(.cluster_fault, [key], true)
+      } else if value == "false" {
+        .cluster_fault = set!(.cluster_fault, [key], false)
+      } else if match(value, r'^\d+$') {
+        .cluster_fault = set!(.cluster_fault, [key], to_int!(value))
+      } else {
+        .cluster_fault = set!(.cluster_fault, [key], value)
+      }
+    }
+    
+    # Add details with proper key name
+    if exists(.details_match.details) {
+      .cluster_fault."clusterFault(details)" = .details_match.details
+    }
+  }
+}
+'''
+
+[transforms.extract_service_info]
+type = "remap"
+inputs = ["extract_cluster_fault"]
+source = '''
+# Extract ServiceInfo structures
+.service_infos = []
+if match(.action_data, r'ServiceInfo\(') {
+  .service_matches = parse_regex_all(.action_data, r'ServiceInfo\((?P<content>[^)]+)\)')
+  
+  for_each(.service_matches) -> |index, match| {
+    service_info = {}
+    
+    # Parse ServiceInfo parameters
+    .params = split(match.content, ",")
+    for_each(.params) -> |_i, param| {
+      param = strip_whitespace(param)
+      if match(param, r'=') {
+        .kv = split(param, "=", 2)
+        if length(.kv) == 2 {
+          key = "ServiceInfo(" + .kv[0] + ")_" + to_string(index)
+          value = .kv[1]
+          
+          # Type conversion
+          if value == "true" {
+            service_info = set!(service_info, [key], true)
+          } else if value == "false" {
+            service_info = set!(service_info, [key], false)
+          } else if match(value, r'^\d+$') {
+            service_info = set!(service_info, [key], to_int!(value))
+          } else {
+            service_info = set!(service_info, [key], value)
+          }
+        }
+      }
+    }
+    
+    .service_infos = push(.service_infos, service_info)
+  }
+}
+'''
+
+[transforms.extract_remaining_kv]
+type = "remap"
+inputs = ["extract_service_info"]
+source = '''
+# Extract other key=value pairs outside structured objects
+.clean_action = replace(.action_data, r'\w+=\{\{[^}]+\}\}', "")
+.clean_action = replace(.clean_action, r'ServiceInfo\([^)]+\)', "")
+
+.other_kv = {}
+.kv_matches = parse_regex_all(.clean_action, r'(?P<key>\w+)=(?P<value>[^}\s\[]+|\[[^\]]*\])')
+
+for_each(.kv_matches) -> |index, match| {
+  key = match.key + "_" + to_string(index)
+  value = match.value
+  
+  # Handle bracketed values
+  if starts_with(value, "[") && ends_with(value, "]") {
+    value = slice!(value, 1, -1)
+  }
+  
+  # Type conversion
+  if value == "true" {
+    .other_kv = set!(.other_kv, [key], true)
+  } else if value == "false" {
+    .other_kv = set!(.other_kv, [key], false)
+  } else if match(value, r'^\d+$') {
+    .other_kv = set!(.other_kv, [key], to_int!(value))
+  } else {
+    .other_kv = set!(.other_kv, [key], value)
+  }
+}
+'''
+
+[transforms.flatten_output]
+type = "remap"
+inputs = ["extract_remaining_kv"]
+source = '''
+# Create final flattened structure
+.output = {}
+
+# Add basic fields with col_ prefix
+.output.col_0 = .parsed.host
+.output.col_1 = .parsed.node  
+.output.col_2 = .parsed.service
+.output.col_3 = .parsed.app
+.output.col_4 = .parsed.service_type
+.output.col_5 = .parsed.id
+.output.col_6 = .parsed.process
+.output.col_7 = .parsed.source_location
+
+# Merge cluster fault data
+if exists(.cluster_fault) {
+  .output = merge(.output, .cluster_fault)
+}
+
+# Merge service info data
+if exists(.service_infos) && length(.service_infos) > 0 {
+  for_each(.service_infos) -> |_index, service_info| {
+    .output = merge(.output, service_info)
+  }
+}
+
+# Merge other key-value data
+if exists(.other_kv) {
+  .output = merge(.output, .other_kv)
+}
+
+# Replace the event with our flattened output
+. = .output
+'''
+
+[sinks.stdout]
+type = "console"
+inputs = ["flatten_output"]
+encoding.codec = "json"

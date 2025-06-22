@@ -1,0 +1,31 @@
+[sources.logs]
+type = "file"
+include = ["./simplelog"]
+read_from = "beginning"
+
+[transforms.basic_parse]
+type = "remap"
+inputs = ["logs"]
+source = '''
+# Parse basic structure
+.host = parse_regex!(.message, r"^([^:]+):").captures[0]
+.rest = parse_regex!(.message, r"^[^:]+:(.*)").captures[0]
+
+# Split the rest into components
+.parts = split(.rest, " ")
+if length(.parts) > 0 { .timestamp = .parts[0] }
+if length(.parts) > 1 { .node = .parts[1] }
+if length(.parts) > 2 { .service = .parts[2] }
+
+# Join remaining parts for further processing
+if length(.parts) > 3 {
+  .message_content = join(.parts[3:], " ")
+} else {
+  .message_content = ""
+}
+'''
+
+[sinks.output]
+type = "console"
+inputs = ["basic_parse"]
+encoding.codec = "json"

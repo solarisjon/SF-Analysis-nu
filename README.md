@@ -26,6 +26,12 @@ This tool provides a complete workflow for analyzing SolidFire logs:
 - **Nushell** (latest) - for querying and data manipulation
 - **macOS/Linux** - tested on Darwin 24.5.0+
 
+### Components
+- **sf-parser-rust/** - High-performance Rust parser (v1.2.0)
+- **sf-filter-rust/** - Fast filtering utility (v1.0.0)
+- **filter-examples.nu** - Convenience scripts for common patterns
+- **test-nushell-queries.nu** - Query compatibility testing
+
 ### SolidFire Log Format Support
 - Structured logs with format: `TIMESTAMP hostname process[pid]: [LEVEL] [COMPONENT] thread class source| content`
 - Key-value pairs: `serviceID=230 usedBytes=1909106990888`
@@ -200,7 +206,7 @@ nu -c 'open data/today-snapshots.json | where snapshotID != null'
 
 ### Convenience Scripts
 ```bash
-# Use provided convenience patterns
+# Use provided convenience patterns  
 nu filter-examples.nu snapshots  # Filter all snapshot operations
 nu filter-examples.nu morning    # Morning hours (04:30-05:30)
 nu filter-examples.nu today      # Today's logs only
@@ -303,15 +309,11 @@ nu filter-examples.nu  # Shows usage patterns
 
 ## Version History
 
-- **v2.0** (Current) - Complete two-stage solution
-  - sf-parser v1.2.0: Strategic sampling, finds all fields
-  - sf-filter v1.0.0: Fast filtering utility
-  - Complete nushell compatibility
-  - Comprehensive documentation
-
-- **v1.2.0** - Fixed schema discovery throughout entire files
-- **v1.1.0** - Added unit tests and nushell validation  
-- **v1.0.0** - Initial high-performance Rust parser
+- **v2.0** (Current) - Production-ready two-stage Rust solution
+  - sf-parser v1.2.0: Strategic sampling, complete schema discovery
+  - sf-filter v1.0.0: High-performance filtering utility
+  - Removed legacy Nushell parsers
+  - Clean, focused architecture
 
 ## Contributing
 

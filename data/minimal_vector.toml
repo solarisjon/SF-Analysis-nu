@@ -1,0 +1,18 @@
+[sources.logs]
+type = "file"
+include = ["./simplelog"]
+read_from = "beginning"
+
+[transforms.basic_parse]
+type = "remap"
+inputs = ["logs"]
+source = '''
+# Just pass through the message and add timestamp
+.original_message = .message
+.processing_time = now()
+'''
+
+[sinks.output]
+type = "console"
+inputs = ["basic_parse"]
+encoding.codec = "json"
