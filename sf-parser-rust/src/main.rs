@@ -323,15 +323,44 @@ impl SolidFireParser {
         let reader = BufReader::new(file);
         
         let mut all_fields = HashSet::new();
-        let sample_size = 1000; // Sample first 1000 lines for schema discovery
+        let lines: Vec<String> = reader.lines().collect::<Result<Vec<_>, _>>()?;
+        let total_lines = lines.len();
         
-        for (i, line) in reader.lines().enumerate() {
-            if i >= sample_size {
-                break;
+        // Sample strategically: first 1000, middle 1000, last 1000, plus every 1000th line
+        let mut sample_indices = HashSet::new();
+        
+        // First 1000 lines
+        for i in 0..std::cmp::min(1000, total_lines) {
+            sample_indices.insert(i);
+        }
+        
+        // Every 1000th line for broad coverage
+        for i in (0..total_lines).step_by(1000) {
+            sample_indices.insert(i);
+        }
+        
+        // Middle section
+        if total_lines > 2000 {
+            let middle_start = total_lines / 2 - 500;
+            let middle_end = std::cmp::min(middle_start + 1000, total_lines);
+            for i in middle_start..middle_end {
+                sample_indices.insert(i);
             }
-            
-            let line = line?;
-            let fields = self.extract_dynamic_field_names(&line);
+        }
+        
+        // Last 1000 lines
+        if total_lines > 1000 {
+            let last_start = std::cmp::max(total_lines - 1000, 1000);
+            for i in last_start..total_lines {
+                sample_indices.insert(i);
+            }
+        }
+        
+        println!("Sampling {} lines from {} total lines for comprehensive schema discovery", 
+            sample_indices.len(), total_lines);
+        
+        for &i in &sample_indices {
+            let fields = self.extract_dynamic_field_names(&lines[i]);
             all_fields.extend(fields);
         }
         
