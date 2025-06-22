@@ -1,199 +1,326 @@
 # SolidFire Log Analysis Tool
 
-A flexible Nushell-based parser for SolidFire storage system logs that converts structured log files into searchable JSON format.
+High-performance, two-stage log analysis system for SolidFire storage systems. Parse massive log files into structured data and create focused datasets for lightning-fast analysis with Nushell.
 
 ## Overview
 
-This tool parses SolidFire `sf-master.info` log files into structured JSON data that can be easily queried using Nushell's powerful data manipulation commands.
+This tool provides a complete workflow for analyzing SolidFire logs:
 
-## Features
+1. **Parse** massive log files into structured JSON with consistent schema
+2. **Filter** into smaller, targeted datasets for specific analysis needs  
+3. **Query** with full Nushell syntax for powerful data exploration
 
-- **Flexible parsing**: Handles multiple SolidFire log formats with graceful degradation
-- **Structured output**: Converts logs to JSON for easy analysis with `open` command
-- **Type conversion**: Automatically converts numeric values and preserves data types
-- **Error handling**: Gracefully handles malformed log entries
-- **Fast processing**: Efficient parsing of large log files (1M+ lines)
-- **UTC timezone**: Separates date and time fields in UTC timezone
+### Key Features
 
-## Usage
-
-### Basic Usage
-
-```bash
-# Parse a log file
-nu sf-log-parser.nu data/sf-master.info.18
-
-# Specify output file
-nu sf-log-parser.nu data/sf-master.info.18 output/parsed-log.json
-```
-
-### Analysis Examples
-
-Once parsed, you can use Nushell's powerful query capabilities:
-
-```bash
-# Open and explore the parsed data
-open sf-master-parsed.json
-
-# Filter by service ID
-open sf-master-parsed.json | where serviceID == 230
-
-# Find logs from specific time range
-open sf-master-parsed.json | where date == "2025-06-05" and time > "09:00:00"
-
-# Group by component and count
-open sf-master-parsed.json | group-by component | transpose component count
-
-# Find error logs
-open sf-master-parsed.json | where level == "ERROR"
-
-# Search for specific content
-open sf-master-parsed.json | where content =~ "snapshot"
-
-# Get unique hostnames
-open sf-master-parsed.json | get hostname | uniq
-
-# Show top services by usage
-open sf-master-parsed.json | where usedBytes != null | sort-by usedBytes -r | first 10
-```
-
-## Log Format Support
-
-The parser handles multiple SolidFire log formats:
-
-### Standard Format
-```
-2025-06-05T00:20:07.858372Z icpbasi03037 master-1[112875]: [APP-5] [MS] 2069182 BSDirector ms/ClusterStatistics.cpp:1452:GetBlockDriveUsageFromStats| serviceID=230 usedBytes=1909106990888
-```
-
-### API Call Format
-```
-2025-06-05T09:55:03.019876Z icpbasi03037 master-1[112875]: [APP-5] [API] 2069183 Scheduler httpserver/RestAPIServer.cpp:321:LogAndDispatch|RestAPI::CreateGroupSnapshot CALL: requestID=null logJson[kParamsKey]={"enableRemoteReplication":true}
-```
-
-### Complex Nested Format
-```
-2025-06-05T00:20:07.869764Z icpbasi03037 master-1[112875]: [APP-5] [BSDirector] 2069182 BSDirector ms/BinSyncUtil.cpp:160:BlockServiceSpaceUsageInfo|BlockServiceSpaceUsageInfo {mAvailableServicesUsableCapacity={633550625832960,0}}
-```
-
-## Output Structure
-
-Each parsed log entry includes:
-
-### Standard Fields
-- `line_num`: Original line number
-- `date`: Date in YYYY-MM-DD format (UTC)
-- `time`: Time in HH:MM:SS.ffffff format (UTC)
-- `timestamp`: Original ISO 8601 timestamp
-- `hostname`: Server hostname
-- `process`: Process name
-- `pid`: Process ID
-- `level`: Log level (APP-5, ERROR, etc.)
-- `component`: Component name (MS, API, Snaps, etc.)
-- `thread`: Thread ID
-- `class`: Class name
-- `source`: Source file and function
-- `content`: Raw log content
-- `raw_line`: Original log line
-- `parse_error`: null if parsed successfully
-
-### Dynamic Fields
-Key=value pairs from log content become individual columns:
-- `serviceID`: Service identifier
-- `usedBytes`: Storage usage in bytes
-- `requestID`: API request ID
-- And many more depending on log content...
-
-## File Structure
-
-```
-├── sf-log-parser.nu          # Main parser script
-├── data/
-│   ├── sf-master.info.18     # Sample log file
-│   └── sf-smallmaster        # Small test file (100 lines)
-├── README.md                 # This file
-└── CLAUDE.md                # Project instructions
-```
+- 🚀 **High Performance**: 49K+ lines/sec parsing, 44K+ records/sec filtering
+- 📊 **Complete Schema Discovery**: Finds ALL fields across entire log files (231+ columns)
+- 🔍 **Consistent Data Structure**: Every record has identical columns, no missing field errors
+- ⚡ **Fast Queries**: 10-100x performance improvement on filtered datasets
+- 🛠️ **Flexible Filtering**: Time ranges, field values, component types
+- 🔧 **Nushell Integration**: Full compatibility with Nushell's powerful query syntax
 
 ## Requirements
 
-- **Nushell**: Latest version
-- **Memory**: Sufficient RAM for log file size (JSON output uses more memory than original)
-- **Storage**: ~2-3x original file size for JSON output
+### System Requirements
+- **Rust** (latest stable) - for building the parsers
+- **Nushell** (latest) - for querying and data manipulation
+- **macOS/Linux** - tested on Darwin 24.5.0+
 
-## Performance
+### SolidFire Log Format Support
+- Structured logs with format: `TIMESTAMP hostname process[pid]: [LEVEL] [COMPONENT] thread class source| content`
+- Key-value pairs: `serviceID=230 usedBytes=1909106990888`
+- Nested objects: `clusterFault={{id=743 type=Service severity=Critical}}`
+- Arrays: `candidateNames={5-0000000014,177-0000000021}`
+- Complex fields: `details=[Block service(s) on more than one node are unhealthy]`
 
-- **Small files** (< 1MB): Sub-second parsing
-- **Medium files** (1-100MB): Seconds to minutes
-- **Large files** (> 100MB): Minutes, progress shown every 10,000 lines
+## Installation
 
-## Examples
-
-### Quick Start
+### Build the Parsers
 ```bash
-# Parse the test file
-nu sf-log-parser.nu data/sf-smallmaster
+# Build main parser
+cd sf-parser-rust
+cargo build --release
 
-# View results
-open sf-smallmaster-parsed.json | first 5
-
-# Find all entries for service 230
-open sf-smallmaster-parsed.json | where serviceID == 230
+# Build filter utility  
+cd ../sf-filter-rust
+cargo build --release
 ```
 
-### Advanced Analysis
+### Verify Installation
 ```bash
-# Storage usage analysis
-open sf-master-parsed.json 
-| where usedBytes != null 
-| select serviceID usedBytes 
-| group-by serviceID 
-| transpose serviceID usage 
-| sort-by usage -r
-
-# Timeline analysis
-open sf-master-parsed.json 
-| select date time component level 
-| where level != "APP-5" 
-| sort-by date time
-
-# Error investigation
-open sf-master-parsed.json 
-| where content =~ "error|failed|exception" 
-| select time hostname component content
+# Check versions
+./sf-parser-rust/target/release/sf-parser --version   # Should show 1.2.0
+./sf-filter-rust/target/release/sf-filter --version   # Should show 1.0.0
 ```
+
+## Quick Start
+
+### 1. Parse Your Log File
+```bash
+# Parse complete SolidFire log into structured JSON
+./sf-parser-rust/target/release/sf-parser data/sf-master.info -o data/output.json
+
+# Output shows:
+# 🔥 SolidFire Log Parser v1.2.0
+# Phase 1: Discovering schema...
+# Found 231 dynamic fields
+# Phase 2: Parsing with consistent schema...
+# Completed: 783733 lines in 15.97s (49087 lines/sec)
+```
+
+### 2. Filter for Focused Analysis
+```bash
+# Create smaller datasets for faster queries
+./sf-filter-rust/target/release/sf-filter data/output.json \
+  --start-time "04:30" --end-time "05:30" \
+  -o data/morning-logs.json
+
+# Output shows:  
+# 🔍 SolidFire Log Filter v1.0.0
+# Filtered 783733 → 2663 records in 338.13ms (44362 records/sec)
+```
+
+### 3. Query with Nushell
+```bash
+# Fast queries on filtered data
+nu -c 'open data/morning-logs.json | where snapshotID == 13846639 | length'
+nu -c 'open data/morning-logs.json | where component == "Snaps" | first 10'
+nu -c 'open data/morning-logs.json | group-by component | columns'
+```
+
+## Use Cases & Examples
+
+### Performance Analysis
+```bash
+# Filter API performance logs
+./sf-filter-rust/target/release/sf-filter data/output.json \
+  --field "component=API" \
+  --start-time "08:00" --end-time "10:00" \
+  -o data/api-performance.json
+
+# Analyze slow operations
+nu -c 'open data/api-performance.json | where totalMS > 1000 | sort-by totalMS | reverse'
+```
+
+### Snapshot Management Analysis
+```bash
+# Get all snapshot-related operations
+./sf-filter-rust/target/release/sf-filter data/output.json \
+  --field "component=Snaps" \
+  -o data/snapshot-analysis.json
+
+# Find snapshot deletion patterns
+nu -c 'open data/snapshot-analysis.json | where content =~ "delete" | group-by snapshotID'
+
+# Track specific snapshot lifecycle
+./sf-filter-rust/target/release/sf-filter data/output.json \
+  --field "snapshotID=13846639" \
+  -o data/snapshot-13846639.json
+```
+
+### Service Health Monitoring
+```bash
+# Monitor specific service
+./sf-filter-rust/target/release/sf-filter data/output.json \
+  --field "serviceID=230" \
+  -o data/service-230.json
+
+# Check service errors during maintenance window
+./sf-filter-rust/target/release/sf-filter data/output.json \
+  --start-date "2025-06-12" \
+  --start-time "02:00" --end-time "04:00" \
+  --field "level=ERROR" \
+  -o data/maintenance-errors.json
+```
+
+### Cluster Analysis
+```bash
+# Daily operational overview
+./sf-filter-rust/target/release/sf-filter data/output.json \
+  --start-date "2025-06-12" --end-date "2025-06-12" \
+  -o data/daily-ops.json
+
+# Analyze by time periods
+nu -c 'open data/daily-ops.json | 
+  insert hour ($it.time | str substring 0..2) | 
+  group-by hour | 
+  each { |group| {hour: $group.name, count: ($group.items | length)} }'
+```
+
+### Troubleshooting Workflows
+```bash
+# Find errors around specific time
+./sf-filter-rust/target/release/sf-filter data/output.json \
+  --start-time "14:25" --end-time "14:35" \
+  --field "level=ERROR" \
+  -o data/incident-analysis.json
+
+# Correlate with warnings  
+./sf-filter-rust/target/release/sf-filter data/output.json \
+  --start-time "14:20" --end-time "14:40" \
+  --field "level=WARN" \
+  -o data/incident-warnings.json
+
+# Multi-component analysis
+nu -c 'open data/incident-analysis.json | group-by component | 
+  each { |group| {component: $group.name, errors: ($group.items | length)} } |
+  sort-by errors | reverse'
+```
+
+## Advanced Usage
+
+### Multiple Field Filters
+```bash
+# Complex filtering scenarios
+./sf-filter-rust/target/release/sf-filter data/output.json \
+  --field "component=MS" \
+  --field "serviceID=230" \
+  --field "level=ERROR" \
+  --start-time "08:00" \
+  -o data/complex-filter.json
+```
+
+### Performance Optimization
+```bash
+# For massive datasets, filter progressively:
+
+# 1. First by time (reduces 783K → ~50K)
+./sf-filter-rust/target/release/sf-filter data/output.json \
+  --start-date "2025-06-12" \
+  -o data/today.json
+
+# 2. Then by component (reduces 50K → ~5K)  
+./sf-filter-rust/target/release/sf-filter data/today.json \
+  --field "component=Snaps" \
+  -o data/today-snapshots.json
+
+# 3. Lightning-fast queries on 5K records
+nu -c 'open data/today-snapshots.json | where snapshotID != null'
+```
+
+### Convenience Scripts
+```bash
+# Use provided convenience patterns
+nu filter-examples.nu snapshots  # Filter all snapshot operations
+nu filter-examples.nu morning    # Morning hours (04:30-05:30)
+nu filter-examples.nu today      # Today's logs only
+
+# Automated testing
+nu test-nushell-queries.nu       # Verify query compatibility
+```
+
+## Parser Capabilities
+
+### sf-parser v1.2.0 Features
+- **Strategic Sampling**: Discovers fields throughout entire file, not just first 1000 lines
+- **Parallel Processing**: Multi-threaded parsing with Rayon
+- **Schema Consistency**: Every record has identical column structure
+- **Type Conversion**: Automatic detection of integers, floats, booleans
+- **Complex Data**: Handles nested objects, arrays, and structured content
+- **Error Handling**: Graceful parsing of malformed entries
+
+### sf-filter v1.0.0 Features
+- **Time Filtering**: Date ranges, time ranges, or both
+- **Field Filtering**: Exact matches on any field value
+- **Multiple Filters**: Combine time and field filters
+- **Parallel Processing**: Fast filtering with Rayon
+- **Custom Output**: Specify output file names
+- **Progress Reporting**: Shows filtering statistics
+
+## Schema Structure
+
+### Core Fields (Always Present)
+```bash
+line_num          # Line number in original file
+date              # YYYY-MM-DD 
+time              # HH:MM:SS.ffffff
+timestamp         # Full ISO timestamp
+hostname          # SolidFire node hostname
+process           # Process name (e.g., "master-1")
+pid               # Process ID
+level             # Log level (APP-5, ERROR, WARN, etc.)
+component         # SolidFire component (MS, Snaps, API, etc.)
+thread            # Thread ID
+class             # C++ class name
+source            # Source file and line
+content           # Original log message content
+raw_line          # Complete original log line
+parse_error       # null or error description
+```
+
+### Dynamic Fields (231+ discovered)
+All fields found throughout the log file, including:
+- `serviceID`, `snapshotID`, `volumeID`, `groupSnapshotID`
+- `usedBytes`, `totalMS`, `responseCreationMS`
+- `component`, `level`, `severity`, `code`
+- Complex nested data from SolidFire operations
+
+## Performance Benchmarks
+
+### Parsing Performance
+- **Large Files**: 783K lines in ~16 seconds (49K lines/sec)
+- **Schema Discovery**: 231 fields found across entire file
+- **Memory Efficient**: Chunked processing prevents memory overflow
+- **Parallel**: Multi-core utilization for maximum speed
+
+### Filtering Performance  
+- **Time Filtering**: 783K → 2.6K records in 338ms (44K records/sec)
+- **Field Filtering**: Complex filters with minimal performance impact
+- **Memory Usage**: Processes data in parallel chunks
+
+### Query Performance
+- **Original File**: 783K records, queries timeout or take minutes
+- **Filtered Files**: 2-5K records, queries complete in milliseconds
+- **Improvement**: 10-100x faster query execution
 
 ## Troubleshooting
 
 ### Common Issues
 
-1. **Parse errors**: Check log format variations, parser handles most cases gracefully
-2. **Memory issues**: Process large files in chunks or use streaming approach
-3. **Performance**: Consider filtering during parsing for very large files
+**"Cannot find column 'snapshotID'"**
+- Solution: Ensure using sf-parser v1.2.0 (check with `--version`)
+- Cause: Older versions only sampled first 1000 lines
 
-### Debug Information
+**Queries are slow**  
+- Solution: Use sf-filter to create smaller datasets first
+- Example: Filter by time/component before complex queries
 
-The parser provides detailed feedback:
-- Line count processed
-- Success/error statistics
-- Processing time
-- Usage examples
+**Parser not finding all fields**
+- Solution: Verify using v1.2.0 with strategic sampling
+- Check: Parser should show "Found 231 dynamic fields"
+
+**Time filtering not working**
+- Solution: Check time format (HH:MM or HH:MM:SS)
+- Solution: Check date format (YYYY-MM-DD)
+- Note: Records with parse errors may have empty time fields
+
+### Getting Help
+```bash
+./sf-parser-rust/target/release/sf-parser --help
+./sf-filter-rust/target/release/sf-filter --help
+nu filter-examples.nu  # Shows usage patterns
+```
+
+## Version History
+
+- **v2.0** (Current) - Complete two-stage solution
+  - sf-parser v1.2.0: Strategic sampling, finds all fields
+  - sf-filter v1.0.0: Fast filtering utility
+  - Complete nushell compatibility
+  - Comprehensive documentation
+
+- **v1.2.0** - Fixed schema discovery throughout entire files
+- **v1.1.0** - Added unit tests and nushell validation  
+- **v1.0.0** - Initial high-performance Rust parser
 
 ## Contributing
 
-This tool follows the project's coding standards:
-- Nushell snake_case conventions
-- Graceful error handling
-- Type hints on functions
-- Comprehensive testing with sample data
+When making changes:
+1. Update version numbers in Cargo.toml files
+2. Run tests: `cargo test` and `nu test-nushell-queries.nu`
+3. Update documentation for new features
+4. Follow commit message conventions for version tracking
 
-## Testing
+## License
 
-Use the provided test file:
-```bash
-# Test with small sample
-nu sf-log-parser.nu data/sf-smallmaster
-
-# Verify output structure
-open sf-smallmaster-parsed.json | columns
-```
+SolidFire Analysis Tool - Internal tooling for SolidFire log analysis.
