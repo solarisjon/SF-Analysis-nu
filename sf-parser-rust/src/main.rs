@@ -242,7 +242,10 @@ impl SolidFireParser {
     
     pub fn parse_file(&self, input_path: &Path, output_path: &Path, chunk_size: usize) -> Result<()> {
         let start_time = Instant::now();
-        println!("Parsing {} to {}", input_path.display(), output_path.display());
+        
+        // Display version and info
+        println!("🔥 SolidFire Log Parser v{}", env!("CARGO_PKG_VERSION"));
+        println!("📊 Parsing {} to {}", input_path.display(), output_path.display());
         
         // Phase 1: Discover all possible dynamic fields
         println!("Phase 1: Discovering schema...");
