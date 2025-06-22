@@ -1,0 +1,10 @@
+/Users/solarisjon/Desktop/src/Jons Projects/SF-AnalysisTool-nu/sf-parser-rust/target/release/deps/libarrow_row-3aa137d1427df3e6.rmeta: /Users/solarisjon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/arrow-row-53.4.1/src/lib.rs /Users/solarisjon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/arrow-row-53.4.1/src/fixed.rs /Users/solarisjon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/arrow-row-53.4.1/src/list.rs /Users/solarisjon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/arrow-row-53.4.1/src/variable.rs
+
+/Users/solarisjon/Desktop/src/Jons Projects/SF-AnalysisTool-nu/sf-parser-rust/target/release/deps/libarrow_row-3aa137d1427df3e6.rlib: /Users/solarisjon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/arrow-row-53.4.1/src/lib.rs /Users/solarisjon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/arrow-row-53.4.1/src/fixed.rs /Users/solarisjon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/arrow-row-53.4.1/src/list.rs /Users/solarisjon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/arrow-row-53.4.1/src/variable.rs
+
+/Users/solarisjon/Desktop/src/Jons Projects/SF-AnalysisTool-nu/sf-parser-rust/target/release/deps/arrow_row-3aa137d1427df3e6.d: /Users/solarisjon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/arrow-row-53.4.1/src/lib.rs /Users/solarisjon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/arrow-row-53.4.1/src/fixed.rs /Users/solarisjon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/arrow-row-53.4.1/src/list.rs /Users/solarisjon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/arrow-row-53.4.1/src/variable.rs
+
+/Users/solarisjon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/arrow-row-53.4.1/src/lib.rs:
+/Users/solarisjon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/arrow-row-53.4.1/src/fixed.rs:
+/Users/solarisjon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/arrow-row-53.4.1/src/list.rs:
+/Users/solarisjon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/arrow-row-53.4.1/src/variable.rs:

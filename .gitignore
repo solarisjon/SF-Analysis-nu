@@ -1,0 +1,30 @@
+# Output files
+*.parsed.json
+rust-*.json
+test-*.json
+sf-master.info-parsed.json
+
+# Large data files (keep sample files only)
+data/sf-master.info.*
+!data/sf-smallmaster
+
+# Build artifacts
+sf-parser-rust/target/
+sf-parser-rust/Cargo.lock
+
+# Temporary files
+output/
+output-safe/
+save/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Nushell
+.nu-history
+
+# OS
+.DS_Store
+Thumbs.db

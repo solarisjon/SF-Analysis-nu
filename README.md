@@ -1,641 +1,199 @@
-# SolidFire Log Analysis Tool 🔥
+# SolidFire Log Analysis Tool
 
-A comprehensive, high-performance log analysis toolkit designed specifically for SolidFire storage system logs. Built with Nushell for powerful data manipulation and analysis, with multi-language preprocessors for maximum performance.
+A flexible Nushell-based parser for SolidFire storage system logs that converts structured log files into searchable JSON format.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Nushell](https://img.shields.io/badge/Nushell-0.90%2B-blue)](https://nushell.sh)
-[![Rust](https://img.shields.io/badge/Rust-1.70%2B-orange)](https://rustlang.org)
-[![Python](https://img.shields.io/badge/Python-3.8%2B-green)](https://python.org)
+## Overview
 
-## 🎯 Purpose & Context
+This tool parses SolidFire `sf-master.info` log files into structured JSON data that can be easily queried using Nushell's powerful data manipulation commands.
 
-SolidFire storage systems generate complex, structured log files containing critical information about cluster health, node status, service operations, and fault conditions. These logs use a unique nested format with:
+## Features
 
-- **Structured Objects**: `clusterFault={{id=123, type=warning, details=[...]}}`
-- **Key-Value Pairs**: `serviceID=1234, status=active, nodeID=5`
-- **Nested Arrays**: `details=[drive1, drive2, drive3]`
-- **Mixed Data Types**: Strings, integers, floats, booleans, timestamps
+- **Flexible parsing**: Handles multiple SolidFire log formats with graceful degradation
+- **Structured output**: Converts logs to JSON for easy analysis with `open` command
+- **Type conversion**: Automatically converts numeric values and preserves data types
+- **Error handling**: Gracefully handles malformed log entries
+- **Fast processing**: Efficient parsing of large log files (1M+ lines)
+- **UTC timezone**: Separates date and time fields in UTC timezone
 
-Traditional log analysis tools struggle with this format, requiring manual parsing or complex regex operations. This toolkit provides purpose-built parsers that understand SolidFire's log structure, automatically extracting and converting data into analyzable tabular formats.
+## Usage
 
-## 🚀 Key Features
-
-### Multi-Engine Architecture
-- **5 specialized parsers** optimized for different scenarios
-- **Performance range**: 8,000 to 300,000 lines/second
-- **Memory management**: Constant memory usage for large files
-- **Format support**: CSV, JSON, JSONL, Parquet output
-
-### Advanced Parsing Capabilities
-- **Nested object extraction** with automatic flattening
-- **Type-aware conversion** (strings → numbers, booleans)
-- **Timestamp normalization** with date/time separation
-- **Duplicate column handling** with smart naming
-- **Malformed entry tolerance** with graceful degradation
-
-### Analysis-Ready Output
-- **Consistent column naming** across all parsers
-- **Structured data access** via object.field notation
-- **Time-series ready** with extracted timestamps
-- **Filter-friendly** format for complex queries
-
-## 📊 Performance Comparison
-
-| Parser | Speed (lines/sec) | Memory Usage | Best For |
-|--------|------------------|--------------|----------|
-| parsesfv2.nu | ~10,000 | Moderate | General analysis, <1GB files |
-| parsesfv3.nu | ~15,000 | Moderate | Optimized analysis, <1GB files |
-| parsesfv4.nu | ~8,000 | Constant | Large files, streaming |
-| parsesfv5.nu + Rust | ~100,000 | Low | Repeated analysis, >1GB files |
-| extract-sf-faults | ~50,000 | Low | Fault analysis only |
-| Python preprocessor | ~300,000 | Variable | Massive files, >5GB |
-
-## 🛠 Installation & Requirements
-
-### Core Requirements
-```bash
-# Install Nushell (latest version recommended)
-# macOS
-brew install nushell
-
-# Linux
-curl -L https://github.com/nushell/nushell/releases/latest/download/nu-0.xx.x-x86_64-unknown-linux-gnu.tar.gz | tar xz
-
-# Windows
-winget install nushell
-```
-
-### Optional Dependencies
-```bash
-# For preprocessing functions
-brew install ripgrep  # or apt-get install ripgrep
-
-# For Rust preprocessor
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-cd sf-parser && cargo build --release
-
-# For Python preprocessor
-pip install uv  # Modern Python package manager
-uv add polars  # High-performance DataFrame library
-```
-
-### Quick Setup
-```bash
-git clone <repository-url>
-cd SF-AnalysisTool-nu
-
-# Test basic functionality
-nu -c "use src/parsesfv2.nu; parse-sf-logs 'data/simplelog' --columns-info"
-
-# Build Rust preprocessor (optional)
-cd sf-parser && cargo build --release && cd ..
-
-# Install Python dependencies (optional)
-uv sync
-```
-
-## 📋 Use Cases & Scenarios
-
-### 1. 🚨 Incident Response & Troubleshooting
-
-**Scenario**: Storage cluster experiencing performance issues, need to identify root cause from logs.
+### Basic Usage
 
 ```bash
-# Quick fault analysis
-nu -c "
-use src/parsesfv4.nu
-extract-sf-faults 'data/sf-master.error' 
-| where timestamp > '2024-01-01T00:00:00'
-| group-by fault_type 
-| each { |group| {type: $group.name, count: ($group.items | length)} }
-| sort-by count -r
-"
+# Parse a log file
+nu sf-log-parser.nu data/sf-master.info.18
 
-# Detailed cluster fault investigation
-nu -c "
-use src/parsesfv5.nu
-let data = parse-sf-logs-rust 'data/sf-master.error'
-$data | analyze-cluster-faults 
-| where clusterFault_severity in ['critical', 'warning']
-| select timestamp clusterFault_type clusterFault_code clusterFault_id
-| sort-by timestamp
-"
+# Specify output file
+nu sf-log-parser.nu data/sf-master.info.18 output/parsed-log.json
 ```
 
-**Benefits**: 
-- Rapid fault identification
-- Time-correlated analysis
-- Severity-based filtering
-- Trend identification
+### Analysis Examples
 
-### 2. 📈 Performance Analysis & Capacity Planning
-
-**Scenario**: Analyzing storage performance trends and predicting capacity needs.
+Once parsed, you can use Nushell's powerful query capabilities:
 
 ```bash
-# Service performance analysis
-nu -c "
-use src/parsesfv3.nu
-parse-sf-logs-fast 'data/sf-master.info.18' 
-| where serviceID != null
-| group-by serviceID
-| each { |group| {
-    service: $group.name,
-    entries: ($group.items | length),
-    nodes: ($group.items | get nodeID | uniq | length),
-    last_seen: ($group.items | get timestamp | max)
-  }}
-| sort-by entries -r
-"
+# Open and explore the parsed data
+open sf-master-parsed.json
 
-# Node health trending
-nu -c "
-use src/parsesfv5.nu
-let data = parse-sf-logs-rust 'data/sf-master.info'
-$data | analyze-node-health
-| group-by nodeID
-| each { |group| {
-    node: $group.name,
-    status_changes: ($group.items | get status | uniq | length),
-    current_status: ($group.items | last | get status),
-    master_changes: ($group.items | get masterID | uniq | length)
-  }}
-"
+# Filter by service ID
+open sf-master-parsed.json | where serviceID == 230
+
+# Find logs from specific time range
+open sf-master-parsed.json | where date == "2025-06-05" and time > "09:00:00"
+
+# Group by component and count
+open sf-master-parsed.json | group-by component | transpose component count
+
+# Find error logs
+open sf-master-parsed.json | where level == "ERROR"
+
+# Search for specific content
+open sf-master-parsed.json | where content =~ "snapshot"
+
+# Get unique hostnames
+open sf-master-parsed.json | get hostname | uniq
+
+# Show top services by usage
+open sf-master-parsed.json | where usedBytes != null | sort-by usedBytes -r | first 10
 ```
 
-**Benefits**:
-- Performance trend identification
-- Capacity utilization tracking
-- Node health monitoring
-- Service distribution analysis
+## Log Format Support
 
-### 3. 🔍 Compliance & Audit Reporting
+The parser handles multiple SolidFire log formats:
 
-**Scenario**: Generate compliance reports showing system activity and change tracking.
+### Standard Format
+```
+2025-06-05T00:20:07.858372Z icpbasi03037 master-1[112875]: [APP-5] [MS] 2069182 BSDirector ms/ClusterStatistics.cpp:1452:GetBlockDriveUsageFromStats| serviceID=230 usedBytes=1909106990888
+```
 
+### API Call Format
+```
+2025-06-05T09:55:03.019876Z icpbasi03037 master-1[112875]: [APP-5] [API] 2069183 Scheduler httpserver/RestAPIServer.cpp:321:LogAndDispatch|RestAPI::CreateGroupSnapshot CALL: requestID=null logJson[kParamsKey]={"enableRemoteReplication":true}
+```
+
+### Complex Nested Format
+```
+2025-06-05T00:20:07.869764Z icpbasi03037 master-1[112875]: [APP-5] [BSDirector] 2069182 BSDirector ms/BinSyncUtil.cpp:160:BlockServiceSpaceUsageInfo|BlockServiceSpaceUsageInfo {mAvailableServicesUsableCapacity={633550625832960,0}}
+```
+
+## Output Structure
+
+Each parsed log entry includes:
+
+### Standard Fields
+- `line_num`: Original line number
+- `date`: Date in YYYY-MM-DD format (UTC)
+- `time`: Time in HH:MM:SS.ffffff format (UTC)
+- `timestamp`: Original ISO 8601 timestamp
+- `hostname`: Server hostname
+- `process`: Process name
+- `pid`: Process ID
+- `level`: Log level (APP-5, ERROR, etc.)
+- `component`: Component name (MS, API, Snaps, etc.)
+- `thread`: Thread ID
+- `class`: Class name
+- `source`: Source file and function
+- `content`: Raw log content
+- `raw_line`: Original log line
+- `parse_error`: null if parsed successfully
+
+### Dynamic Fields
+Key=value pairs from log content become individual columns:
+- `serviceID`: Service identifier
+- `usedBytes`: Storage usage in bytes
+- `requestID`: API request ID
+- And many more depending on log content...
+
+## File Structure
+
+```
+├── sf-log-parser.nu          # Main parser script
+├── data/
+│   ├── sf-master.info.18     # Sample log file
+│   └── sf-smallmaster        # Small test file (100 lines)
+├── README.md                 # This file
+└── CLAUDE.md                # Project instructions
+```
+
+## Requirements
+
+- **Nushell**: Latest version
+- **Memory**: Sufficient RAM for log file size (JSON output uses more memory than original)
+- **Storage**: ~2-3x original file size for JSON output
+
+## Performance
+
+- **Small files** (< 1MB): Sub-second parsing
+- **Medium files** (1-100MB): Seconds to minutes
+- **Large files** (> 100MB): Minutes, progress shown every 10,000 lines
+
+## Examples
+
+### Quick Start
 ```bash
-# Configuration change audit
-nu -c "
-use src/parsesfv2.nu
-parse-sf-logs 'data/sf-master.info' 
-| where col_1 == 'CONFIG'
-| select timestamp col_2 col_3 col_4
-| rename timestamp event_time component action details
-| sort-by event_time
-| to csv
-" | save audit_report.csv
+# Parse the test file
+nu sf-log-parser.nu data/sf-smallmaster
 
-# Service status compliance
-nu -c "
-use src/load_jsonl.nu
-load-sf-data --type '*status*' --limit 10000
-| where status != null
-| group-by date
-| each { |group| {
-    date: $group.name,
-    services_active: ($group.items | where status == 'active' | length),
-    services_total: ($group.items | length),
-    compliance_pct: (($group.items | where status == 'active' | length) / ($group.items | length) * 100)
-  }}
-| sort-by date
-"
+# View results
+open sf-smallmaster-parsed.json | first 5
+
+# Find all entries for service 230
+open sf-smallmaster-parsed.json | where serviceID == 230
 ```
 
-**Benefits**:
-- Automated compliance reporting
-- Change tracking and attribution
-- Service level agreement monitoring
-- Historical trend documentation
-
-### 4. 🧪 Development & Testing
-
-**Scenario**: Analyzing logs during development and testing phases.
-
+### Advanced Analysis
 ```bash
-# Quick log exploration
-nu -c "
-use src/parsesfv2.nu
-parse-sf-logs 'data/simplelog' --columns-info
-"
+# Storage usage analysis
+open sf-master-parsed.json 
+| where usedBytes != null 
+| select serviceID usedBytes 
+| group-by serviceID 
+| transpose serviceID usage 
+| sort-by usage -r
 
-# Sample data extraction for testing
-nu -c "
-use src/load_jsonl.nu
-load-sf-sample 100 
-| where clusterFault_type != null
-| select timestamp clusterFault_type clusterFault_severity
-| to json
-" | save test_data.json
+# Timeline analysis
+open sf-master-parsed.json 
+| select date time component level 
+| where level != "APP-5" 
+| sort-by date time
 
-# Performance benchmarking
-nu -c "
-use src/parsesfv3.nu
-let start = (date now)
-let data = parse-sf-logs-fast 'data/sf-master.info.18'
-let end = (date now)
-let duration = ($end - $start)
-let lines = ($data | length)
-print $'Processed ($lines) lines in ($duration)'
-print $'Rate: (($lines / ($duration | into int) * 1000000000) | math round) lines/second'
-"
+# Error investigation
+open sf-master-parsed.json 
+| where content =~ "error|failed|exception" 
+| select time hostname component content
 ```
 
-**Benefits**:
-- Rapid prototyping and testing
-- Performance validation
-- Sample data generation
-- Development workflow integration
-
-### 5. 🏢 Enterprise Monitoring & Alerting
-
-**Scenario**: Integrate with monitoring systems for proactive alerting.
-
-```bash
-# Critical alert detection
-nu -c "
-use src/parsesfv4.nu
-extract-sf-faults 'data/sf-master.error'
-| where fault_type == 'critical' and timestamp > ((date now) - 1hr)
-| each { |fault| {
-    alert_level: 'CRITICAL',
-    timestamp: $fault.timestamp,
-    message: $fault.raw_fault,
-    action_required: true
-  }}
-| to json
-" | curl -X POST -H 'Content-Type: application/json' -d @- http://monitoring-system/alerts
-
-# Health dashboard data
-nu -c "
-use src/parsesfv5.nu
-let data = parse-sf-logs-rust 'data/sf-master.info'
-{
-  cluster_health: ($data | analyze-cluster-faults | where clusterFault_severity == 'critical' | length),
-  node_count: ($data | analyze-node-health | get nodeID | uniq | length),
-  active_services: ($data | analyze-services | where status == 'active' | length),
-  last_update: (date now | date format '%Y-%m-%d %H:%M:%S')
-}
-| to json
-"
-```
-
-**Benefits**:
-- Real-time alerting capability
-- Dashboard integration
-- Automated monitoring
-- Proactive issue detection
-
-## 📁 Project Structure
-
-```
-SF-AnalysisTool-nu/
-├── src/                          # Source code
-│   ├── parsesfv2.nu             # Core parser (comprehensive)
-│   ├── parsesfv3.nu             # Fast parser (optimized)
-│   ├── parsesfv4.nu             # Streaming parser (large files)
-│   ├── parsesfv5.nu             # Rust-accelerated parser
-│   ├── load_jsonl.nu            # JSONL loader utilities
-│   ├── preprocess.nu            # Ripgrep preprocessor
-│   ├── sf_parser.rs             # Rust preprocessor
-│   ├── sf_preprocessor.py       # Python preprocessor
-│   └── oldcode/                 # Legacy implementations
-├── data/                        # Sample log files
-│   ├── simplelog               # Small test file
-│   ├── sf-master.info.18       # Realistic test file
-│   ├── sf-master.error         # Error log sample
-│   └── ...                     # Additional log files
-├── output/                      # Processed output files
-│   ├── *.jsonl                 # JSONL outputs
-│   └── *.parquet               # Parquet outputs
-├── sf-parser/                   # Rust preprocessor project
-│   ├── src/main.rs             # Rust source
-│   ├── Cargo.toml              # Rust dependencies
-│   └── target/release/         # Compiled binaries
-├── docs/                        # Documentation
-│   └── www.nushell.sh/         # Nushell language reference
-├── CLAUDE.md                    # Project instructions
-├── README.md                    # This file
-├── sf-analysis-tool.1          # Man page
-└── pyproject.toml              # Python dependencies
-```
-
-## 🎛 Parser Selection Guide
-
-### Choose parsesfv2.nu when:
-- ✅ File size < 1GB
-- ✅ Need full feature support
-- ✅ Interactive analysis
-- ✅ Complete data extraction required
-- ✅ First-time users
-
-### Choose parsesfv3.nu when:
-- ✅ File size < 1GB
-- ✅ Performance is priority
-- ✅ Frequent parsing operations
-- ✅ Compatible output format needed
-- ✅ CPU-optimized environment
-
-### Choose parsesfv4.nu when:
-- ✅ File size > 1GB
-- ✅ Limited memory available
-- ✅ Only need cluster faults
-- ✅ Can process in chunks
-- ✅ Long-running operations
-
-### Choose parsesfv5.nu when:
-- ✅ File size > 1GB
-- ✅ Repeated analysis needed
-- ✅ Maximum performance required
-- ✅ Have Rust toolchain
-- ✅ Batch processing workflows
-
-### Choose Python preprocessor when:
-- ✅ File size > 5GB
-- ✅ Python environment preferred
-- ✅ Parquet output desired
-- ✅ Maximum preprocessing speed
-- ✅ Integration with Python analytics
-
-## 📖 Quick Start Examples
-
-### Basic Analysis
-```bash
-# Parse and explore a log file
-nu -c "
-use src/parsesfv2.nu
-let data = parse-sf-logs 'data/sf-master.info.18' --columns-info
-print 'Sample data:'
-$data | first 5
-"
-```
-
-### Performance Analysis
-```bash
-# Compare parser performance
-nu -c "
-let parsers = [
-  {name: 'v2', file: 'src/parsesfv2.nu', func: 'parse-sf-logs'},
-  {name: 'v3', file: 'src/parsesfv3.nu', func: 'parse-sf-logs-fast'}
-]
-
-$parsers | each { |parser|
-  let start = (date now)
-  nu -c $'use ($parser.file); ($parser.func) \"data/simplelog\"' | ignore
-  let end = (date now)
-  {parser: $parser.name, duration: ($end - $start)}
-}
-"
-```
-
-### Data Pipeline
-```bash
-# Complete analysis pipeline
-nu -c "
-# 1. Parse logs
-use src/parsesfv3.nu
-let raw_data = parse-sf-logs-fast 'data/sf-master.info.18'
-
-# 2. Extract cluster faults
-let faults = $raw_data | where clusterFault_type != null
-
-# 3. Analyze by severity
-let analysis = $faults 
-| group-by clusterFault_severity 
-| each { |group| {
-    severity: $group.name,
-    count: ($group.items | length),
-    types: ($group.items | get clusterFault_type | uniq)
-  }}
-
-# 4. Export results
-$analysis | to csv | save fault_analysis.csv
-print 'Analysis complete! Results saved to fault_analysis.csv'
-
-# 5. Display summary
-$analysis | table
-"
-```
-
-## 🔧 Advanced Configuration
-
-### Environment Variables
-```bash
-# Set default chunk size for streaming parser
-export SF_CHUNK_SIZE=5000
-
-# Set output directory
-export SF_OUTPUT_DIR="./processed_logs"
-
-# Enable debug logging
-export SF_DEBUG=1
-```
-
-### Custom Analysis Functions
-```nushell
-# Create custom analysis function
-def analyze-service-health [] {
-  where serviceID != null
-  | group-by serviceID
-  | each { |group|
-      let items = $group.items
-      {
-        service_id: $group.name,
-        status_count: ($items | length),
-        unique_nodes: ($items | get nodeID | uniq | length),
-        last_activity: ($items | get timestamp | max),
-        health_score: (if ($items | any { |item| $item.status == "error" }) { 0 } else { 100 })
-      }
-    }
-  | sort-by health_score
-}
-
-# Use custom function
-use src/parsesfv3.nu
-parse-sf-logs-fast 'data/sf-master.info.18' | analyze-service-health
-```
-
-## 🧪 Testing & Validation
-
-### Run Test Suite
-```bash
-# Basic functionality test
-nu -c "
-use src/parsesfv2.nu
-let result = parse-sf-logs 'data/simplelog'
-assert ($result | length) > 0
-print 'Basic parsing test: PASSED'
-"
-
-# Performance benchmark
-nu scripts/benchmark.nu
-
-# Data integrity test
-nu scripts/validate_output.nu
-```
-
-### Sample Data Generation
-```bash
-# Generate test data
-nu -c "
-use src/load_jsonl.nu
-load-sf-sample 1000 
-| where clusterFault_type != null
-| to json | save test_cluster_faults.json
-
-print 'Test data generated: test_cluster_faults.json'
-"
-```
-
-## 🚀 Performance Tuning
-
-### Memory Optimization
-- Use streaming parsers for files > 1GB
-- Set appropriate chunk sizes
-- Clear intermediate variables
-- Use `--limit` parameters when exploring
-
-### CPU Optimization
-- Use parsesfv3.nu for CPU-optimized parsing
-- Enable Rust preprocessor for repeated analysis
-- Utilize parallel processing for multiple files
-- Consider Python preprocessor for maximum speed
-
-### I/O Optimization
-- Use SSD storage for log files
-- Process files locally when possible
-- Use JSONL format for intermediate storage
-- Consider Parquet for analytical workloads
-
-## 📊 Monitoring & Observability
-
-### Progress Tracking
-```bash
-# Monitor parsing progress
-tail -f /tmp/sf_parsing.log &
-nu -c "
-use src/parsesfv4.nu
-parse-sf-logs-streaming 'data/large-file.log' 1000 2>/tmp/sf_parsing.log
-"
-```
-
-### Resource Usage Monitoring
-```bash
-# Monitor memory usage during parsing
-nu -c "
-let start_mem = (ps | where name =~ 'nu' | get mem | math sum)
-use src/parsesfv2.nu
-parse-sf-logs 'data/sf-master.info.18' | ignore
-let end_mem = (ps | where name =~ 'nu' | get mem | math sum)
-print $'Memory usage: (($end_mem - $start_mem) / 1024 / 1024) MB'
-"
-```
-
-## 🤝 Contributing
-
-### Development Setup
-```bash
-# Clone repository
-git clone <repository-url>
-cd SF-AnalysisTool-nu
-
-# Install development dependencies
-uv sync --dev
-
-# Run tests
-nu tests/run_all_tests.nu
-
-# Format code (if applicable)
-cargo fmt --all  # For Rust code
-black src/      # For Python code
-```
-
-### Code Standards
-- Use `snake_case` for Nushell variables and functions
-- Add comprehensive documentation headers
-- Test with `data/simplelog` before committing
-- Update README.md for new features
-- Follow existing error handling patterns
-
-### Adding New Parsers
-1. Create new parser file: `src/parsesfv{N}.nu`
-2. Add comprehensive documentation header
-3. Implement core parsing function
-4. Add performance benchmarks
-5. Update README.md and man page
-6. Add test cases
-
-## 📝 Version History
-
-### v5.0 (Current)
-- ✨ Rust-accelerated hybrid parser
-- ✨ Python preprocessor with Polars
-- ✨ Comprehensive documentation
-- ✨ Man page and advanced examples
-- 🐛 Improved error handling
-- ⚡ Performance optimizations
-
-### v4.0
-- ✨ Streaming parser for large files
-- ✨ Ultra-fast fault extractor
-- ✨ Memory-efficient processing
-- 🐛 Fixed duplicate column handling
-
-### v3.0
-- ✨ Optimized fast parser
-- ✨ Improved type conversion
-- ⚡ 15-20% performance improvement
-
-### v2.0
-- ✨ Core parser with full features
-- ✨ Comprehensive log parsing
-- ✨ Type-aware conversion
-- ✨ Timestamp extraction
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🆘 Support & Troubleshooting
+## Troubleshooting
 
 ### Common Issues
 
-**Issue**: `parse-sf-logs: command not found`
+1. **Parse errors**: Check log format variations, parser handles most cases gracefully
+2. **Memory issues**: Process large files in chunks or use streaming approach
+3. **Performance**: Consider filtering during parsing for very large files
+
+### Debug Information
+
+The parser provides detailed feedback:
+- Line count processed
+- Success/error statistics
+- Processing time
+- Usage examples
+
+## Contributing
+
+This tool follows the project's coding standards:
+- Nushell snake_case conventions
+- Graceful error handling
+- Type hints on functions
+- Comprehensive testing with sample data
+
+## Testing
+
+Use the provided test file:
 ```bash
-# Solution: Import the module first
-use src/parsesfv2.nu
-parse-sf-logs "your-file.log"
+# Test with small sample
+nu sf-log-parser.nu data/sf-smallmaster
+
+# Verify output structure
+open sf-smallmaster-parsed.json | columns
 ```
-
-**Issue**: Out of memory errors
-```bash
-# Solution: Use streaming parser
-use src/parsesfv4.nu
-parse-sf-logs-streaming "large-file.log" 1000
-```
-
-**Issue**: Slow parsing performance
-```bash
-# Solution: Use optimized parser or Rust preprocessor
-use src/parsesfv3.nu  # For moderate speedup
-# OR
-use src/parsesfv5.nu  # For maximum speed
-parse-sf-logs-rust "file.log" --preprocess
-```
-
-### Getting Help
-- 📚 Check the man page: `man ./sf-analysis-tool.1`
-- 💬 Review examples in this README
-- 🐛 Check existing issues in the repository
-- 💡 Create new issues for bugs or feature requests
-
-### Performance Troubleshooting
-- Monitor memory usage with system tools
-- Use appropriate parser for file size
-- Consider preprocessing for repeated analysis
-- Optimize chunk sizes for streaming operations
-
----
-
-**Built with ❤️ for the SolidFire community**
-
-*This tool is designed to make SolidFire log analysis accessible, efficient, and insightful. Whether you're troubleshooting issues, monitoring performance, or conducting compliance audits, we've got you covered.*

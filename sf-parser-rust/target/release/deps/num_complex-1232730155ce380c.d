@@ -1,0 +1,10 @@
+/Users/solarisjon/Desktop/src/Jons Projects/SF-AnalysisTool-nu/sf-parser-rust/target/release/deps/libnum_complex-1232730155ce380c.rmeta: /Users/solarisjon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/num-complex-0.4.6/src/lib.rs /Users/solarisjon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/num-complex-0.4.6/src/cast.rs /Users/solarisjon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/num-complex-0.4.6/src/pow.rs /Users/solarisjon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/num-complex-0.4.6/src/complex_float.rs
+
+/Users/solarisjon/Desktop/src/Jons Projects/SF-AnalysisTool-nu/sf-parser-rust/target/release/deps/libnum_complex-1232730155ce380c.rlib: /Users/solarisjon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/num-complex-0.4.6/src/lib.rs /Users/solarisjon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/num-complex-0.4.6/src/cast.rs /Users/solarisjon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/num-complex-0.4.6/src/pow.rs /Users/solarisjon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/num-complex-0.4.6/src/complex_float.rs
+
+/Users/solarisjon/Desktop/src/Jons Projects/SF-AnalysisTool-nu/sf-parser-rust/target/release/deps/num_complex-1232730155ce380c.d: /Users/solarisjon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/num-complex-0.4.6/src/lib.rs /Users/solarisjon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/num-complex-0.4.6/src/cast.rs /Users/solarisjon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/num-complex-0.4.6/src/pow.rs /Users/solarisjon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/num-complex-0.4.6/src/complex_float.rs
+
+/Users/solarisjon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/num-complex-0.4.6/src/lib.rs:
+/Users/solarisjon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/num-complex-0.4.6/src/cast.rs:
+/Users/solarisjon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/num-complex-0.4.6/src/pow.rs:
+/Users/solarisjon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/num-complex-0.4.6/src/complex_float.rs:

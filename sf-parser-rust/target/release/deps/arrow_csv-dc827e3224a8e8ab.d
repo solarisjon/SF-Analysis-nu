@@ -1,0 +1,10 @@
+/Users/solarisjon/Desktop/src/Jons Projects/SF-AnalysisTool-nu/sf-parser-rust/target/release/deps/libarrow_csv-dc827e3224a8e8ab.rmeta: /Users/solarisjon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/arrow-csv-53.4.1/src/lib.rs /Users/solarisjon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/arrow-csv-53.4.1/src/reader/mod.rs /Users/solarisjon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/arrow-csv-53.4.1/src/reader/records.rs /Users/solarisjon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/arrow-csv-53.4.1/src/writer.rs
+
+/Users/solarisjon/Desktop/src/Jons Projects/SF-AnalysisTool-nu/sf-parser-rust/target/release/deps/libarrow_csv-dc827e3224a8e8ab.rlib: /Users/solarisjon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/arrow-csv-53.4.1/src/lib.rs /Users/solarisjon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/arrow-csv-53.4.1/src/reader/mod.rs /Users/solarisjon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/arrow-csv-53.4.1/src/reader/records.rs /Users/solarisjon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/arrow-csv-53.4.1/src/writer.rs
+
+/Users/solarisjon/Desktop/src/Jons Projects/SF-AnalysisTool-nu/sf-parser-rust/target/release/deps/arrow_csv-dc827e3224a8e8ab.d: /Users/solarisjon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/arrow-csv-53.4.1/src/lib.rs /Users/solarisjon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/arrow-csv-53.4.1/src/reader/mod.rs /Users/solarisjon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/arrow-csv-53.4.1/src/reader/records.rs /Users/solarisjon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/arrow-csv-53.4.1/src/writer.rs
+
+/Users/solarisjon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/arrow-csv-53.4.1/src/lib.rs:
+/Users/solarisjon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/arrow-csv-53.4.1/src/reader/mod.rs:
+/Users/solarisjon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/arrow-csv-53.4.1/src/reader/records.rs:
+/Users/solarisjon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/arrow-csv-53.4.1/src/writer.rs:
